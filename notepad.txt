@@ -1,0 +1,908 @@
+-- CARE Group Medical Services Database Schema
+
+CREATE DATABASE IF NOT EXISTS medical;
+USE medical;
+
+-- Cities Master Table
+CREATE TABLE cities (
+    city_id INT PRIMARY KEY AUTO_INCREMENT,
+    city_name VARCHAR(100) NOT NULL UNIQUE,
+    state VARCHAR(100) NOT NULL,
+    country VARCHAR(100) DEFAULT 'India',
+    status ENUM('active', 'inactive') DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Users/Login Table
+CREATE TABLE users (
+    user_id INT PRIMARY KEY AUTO_INCREMENT,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    role ENUM('admin', 'doctor', 'patient') NOT NULL,
+    status ENUM('active', 'inactive', 'suspended') DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_login TIMESTAMP NULL
+);
+
+-- Specializations Table
+CREATE TABLE specializations (
+    specialization_id INT PRIMARY KEY AUTO_INCREMENT,
+    specialization_name VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT,
+    icon VARCHAR(50)
+);
+
+-- Doctors Table
+CREATE TABLE doctors (
+    doctor_id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    full_name VARCHAR(100) NOT NULL,
+    specialization_id INT NOT NULL,
+    qualification VARCHAR(255) NOT NULL,
+    experience_years INT NOT NULL,
+    registration_number VARCHAR(50) NOT NULL UNIQUE,
+    phone VARCHAR(15) NOT NULL,
+    alternate_phone VARCHAR(15),
+    email VARCHAR(100) NOT NULL,
+    address TEXT NOT NULL,
+    city_id INT NOT NULL,
+    consultation_fee DECIMAL(10, 2) NOT NULL,
+    profile_image VARCHAR(255),
+    bio TEXT,
+    rating DECIMAL(3, 2) DEFAULT 0.00,
+    total_reviews INT DEFAULT 0,
+    status ENUM('active', 'inactive') DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (specialization_id) REFERENCES specializations(specialization_id),
+    FOREIGN KEY (city_id) REFERENCES cities(city_id)
+);
+
+-- Doctor Availability Table
+CREATE TABLE IF NOT EXISTS doctor_availability (
+        availability_id INT PRIMARY KEY AUTO_INCREMENT,
+        doctor_id INT NOT NULL,
+        availability_type ENUM('daily', 'weekly', 'monthly') NOT NULL,
+        time_slot TIME NOT NULL,
+        start_date DATE NOT NULL,
+        end_date DATE,
+        start_time TIME NOT NULL,
+        end_time TIME NOT NULL,
+        max_patients INT DEFAULT 5,
+        is_active BOOLEAN DEFAULT TRUE,
+        is_available TINYINT(1) DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_doctor_date (doctor_id, start_date),
+        FOREIGN KEY (doctor_id) REFERENCES doctors(doctor_id) ON DELETE CASCADE
+    )
+;
+
+-- Doctor Leave/Unavailability Table
+CREATE TABLE doctor_leaves (
+    leave_id INT PRIMARY KEY AUTO_INCREMENT,
+    doctor_id INT NOT NULL,
+    leave_date DATE NOT NULL,
+    reason VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (doctor_id) REFERENCES doctors(doctor_id) ON DELETE CASCADE
+);
+
+-- Patients Table
+CREATE TABLE patients (
+    patient_id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    full_name VARCHAR(100) NOT NULL,
+    date_of_birth DATE,
+    gender ENUM('Male', 'Female', 'Other') NOT NULL,
+    phone VARCHAR(15) NOT NULL,
+    alternate_phone VARCHAR(15),
+    email VARCHAR(100) NOT NULL,
+    address TEXT NOT NULL,
+    city_id INT NOT NULL,
+    blood_group VARCHAR(5),
+    emergency_contact_name VARCHAR(100),
+    emergency_contact_phone VARCHAR(15),
+    medical_history TEXT,
+    allergies TEXT,
+    profile_image VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (city_id) REFERENCES cities(city_id)
+);
+
+-- Appointments Table
+CREATE TABLE appointments (
+    appointment_id INT PRIMARY KEY AUTO_INCREMENT,
+    patient_id INT NOT NULL,
+    doctor_id INT NOT NULL,
+    appointment_date DATE NOT NULL,
+    appointment_time TIME NOT NULL,
+    status ENUM('scheduled', 'completed', 'cancelled', 'no-show') DEFAULT 'scheduled',
+    symptoms TEXT,
+    diagnosis TEXT,
+    prescription TEXT,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (patient_id) REFERENCES patients(patient_id) ON DELETE CASCADE,
+    FOREIGN KEY (doctor_id) REFERENCES doctors(doctor_id) ON DELETE CASCADE,
+    INDEX idx_doctor_date (doctor_id, appointment_date),
+    INDEX idx_patient_date (patient_id, appointment_date)
+);
+
+-- Medical records table
+CREATE TABLE IF NOT EXISTS medical_records (
+    record_id INT PRIMARY KEY AUTO_INCREMENT,
+    patient_id INT NOT NULL,
+    doctor_id INT NOT NULL,
+    appointment_id INT,
+    record_date DATE NOT NULL,
+    diagnosis TEXT,
+    prescription TEXT,
+    notes TEXT,
+    symptoms TEXT,
+    vital_signs JSON,
+    attachments TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (patient_id) REFERENCES patients(patient_id),
+    FOREIGN KEY (doctor_id) REFERENCES doctors(doctor_id),
+    FOREIGN KEY (appointment_id) REFERENCES appointments(appointment_id)
+);
+
+-- Patient vital signs table
+CREATE TABLE IF NOT EXISTS patient_vital_signs (
+    vital_id INT PRIMARY KEY AUTO_INCREMENT,
+    patient_id INT NOT NULL,
+    doctor_id INT NOT NULL,
+    appointment_id INT,
+    blood_pressure VARCHAR(20),
+    heart_rate INT,
+    temperature DECIMAL(4,2),
+    weight DECIMAL(5,2),
+    height DECIMAL(5,2),
+    oxygen_saturation INT,
+    respiratory_rate INT,
+    recorded_date DATE NOT NULL,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (patient_id) REFERENCES patients(patient_id),
+    FOREIGN KEY (doctor_id) REFERENCES doctors(doctor_id),
+    FOREIGN KEY (appointment_id) REFERENCES appointments(appointment_id)
+);
+
+-- Create reviews 
+CREATE TABLE reviews (
+    review_id INT AUTO_INCREMENT PRIMARY KEY,
+    doctor_id INT NOT NULL,
+    patient_id INT NOT NULL,
+    appointment_id INT DEFAULT NULL,
+    rating INT NOT NULL,
+    comment TEXT,
+    status ENUM('pending', 'approved', 'rejected') DEFAULT 'approved',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (doctor_id) REFERENCES doctors(doctor_id) ON DELETE CASCADE,
+    FOREIGN KEY (patient_id) REFERENCES patients(patient_id) ON DELETE CASCADE,
+    FOREIGN KEY (appointment_id) REFERENCES appointments(appointment_id) ON DELETE SET NULL,
+    UNIQUE KEY unique_patient_doctor_appointment (patient_id, doctor_id, appointment_id),
+    INDEX idx_doctor_status (doctor_id, status),
+    INDEX idx_patient_id (patient_id),
+    CHECK (rating BETWEEN 1 AND 5)
+);
+
+-- Diseases Information Table
+CREATE TABLE diseases (
+    disease_id INT PRIMARY KEY AUTO_INCREMENT,
+    disease_name VARCHAR(100) NOT NULL,
+    category VARCHAR(50),
+    description TEXT NOT NULL,
+    symptoms TEXT,
+    prevention TEXT,
+    cure TEXT,
+    image VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Medical News Table
+CREATE TABLE IF NOT EXISTS medical_news (
+    news_id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    image_url VARCHAR(500),
+    category VARCHAR(100) NOT NULL,
+    author VARCHAR(100) NOT NULL,
+    published_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status ENUM('published', 'draft') DEFAULT 'published',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Medical Inventions Table
+CREATE TABLE medical_inventions (
+    invention_id INT PRIMARY KEY AUTO_INCREMENT,
+    title VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    inventor VARCHAR(100),
+    year INT,
+    category VARCHAR(50),
+    image VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Contact Messages Table
+CREATE TABLE contact_messages (
+    message_id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) NOT NULL,
+    phone VARCHAR(15),
+    subject VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    status ENUM('new', 'read', 'replied') DEFAULT 'new',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Insert Default Admin User
+INSERT INTO users (username, password, email, role) VALUES 
+('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin@caregroup.com', 'admin');
+-- Default password: password (use password_hash() in PHP for production)
+
+-- Insert Sample Cities
+INSERT INTO cities (city_name, state, country) VALUES
+('New York', 'New York', 'United States'),
+('Los Angeles', 'California', 'United States'),
+('Chicago', 'Illinois', 'United States'),
+('Houston', 'Texas', 'United States'),
+('Phoenix', 'Arizona', 'United States'),
+('Philadelphia', 'Pennsylvania', 'United States'),
+('San Antonio', 'Texas', 'United States'),
+('San Diego', 'California', 'United States');
+
+-- Insert Specializations
+INSERT INTO specializations (specialization_name, description, icon) VALUES
+('Cardiologist', 'Heart and cardiovascular system specialist', 'fa-heartbeat'),
+('Dermatologist', 'Skin, hair and nail specialist', 'fa-hand-sparkles'),
+('Pediatrician', 'Children health specialist', 'fa-baby'),
+('Orthopedic', 'Bone and joint specialist', 'fa-bone'),
+('Neurologist', 'Brain and nervous system specialist', 'fa-brain'),
+('Gynecologist', 'Women health specialist', 'fa-venus'),
+('General Physician', 'General health and common diseases', 'fa-user-md'),
+('Dentist', 'Dental and oral health specialist', 'fa-tooth'),
+('Ophthalmologist', 'Eye specialist', 'fa-eye'),
+('ENT Specialist', 'Ear, Nose and Throat specialist', 'fa-ear-listen');
+
+-- Insert Sample Diseases
+INSERT INTO diseases (disease_name, category, description, symptoms, prevention, cure) VALUES
+('Diabetes', 'Metabolic', 'A chronic condition affecting blood sugar regulation', 'Increased thirst, frequent urination, fatigue, blurred vision', 'Maintain healthy weight, regular exercise, balanced diet', 'Insulin therapy, oral medications, lifestyle changes'),
+('Hypertension', 'Cardiovascular', 'High blood pressure condition', 'Headaches, shortness of breath, nosebleeds', 'Low sodium diet, regular exercise, stress management', 'Antihypertensive medications, lifestyle modifications'),
+('Asthma', 'Respiratory', 'Chronic inflammatory airway disease', 'Wheezing, coughing, chest tightness, breathlessness', 'Avoid triggers, maintain good air quality', 'Inhalers, bronchodilators, corticosteroids');
+
+-- Insert Sample Medical News
+INSERT INTO medical_news (title, content, category, author) VALUES
+('New Breakthrough in Cancer Treatment', 'Researchers have discovered a novel immunotherapy approach that shows promising results in treating aggressive cancers...', 'Research', 'Dr. Sarah Johnson'),
+('AI in Healthcare: Transforming Diagnosis', 'Artificial Intelligence is revolutionizing medical diagnosis with accuracy rates surpassing human doctors in certain conditions...', 'Technology', 'Dr. Michael Chen');
+
+-- Create Indexes for Performance
+CREATE INDEX idx_appointments_status ON appointments(status);
+CREATE INDEX idx_doctors_city ON doctors(city_id);
+CREATE INDEX idx_doctors_specialization ON doctors(specialization_id);
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_role ON users(role);
+
+CREATE TABLE settings (
+    setting_id INT PRIMARY KEY AUTO_INCREMENT,
+    setting_key VARCHAR(100) NOT NULL UNIQUE,
+    setting_value TEXT NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Insert Sample Settings
+INSERT INTO settings (setting_key, setting_value, description) VALUES
+('site_name', 'CARE Group', 'Name of the website displayed in branding'),
+('support_email', 'info@caregroup.com', 'Email address for support queries'),
+('support_phone', '+91 1800-123-4567', 'Phone number for support'),
+('default_slot_duration', '30', 'Default appointment slot duration in minutes'),
+('max_appointments_per_day', '20', 'Maximum appointments a doctor can have per day');
+
+CREATE TABLE billing (
+    billing_id INT PRIMARY KEY AUTO_INCREMENT,
+    appointment_id INT NOT NULL,
+    doctor_id INT NOT NULL,
+    patient_id INT NOT NULL,
+    amount DECIMAL(10, 2) NOT NULL,
+    status ENUM('pending', 'paid', 'failed') DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (appointment_id) REFERENCES appointments(appointment_id) ON DELETE CASCADE,
+    FOREIGN KEY (doctor_id) REFERENCES doctors(doctor_id) ON DELETE CASCADE,
+    FOREIGN KEY (patient_id) REFERENCES patients(patient_id) ON DELETE CASCADE
+);
+
+CREATE TABLE content (
+    content_id INT PRIMARY KEY AUTO_INCREMENT,
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    type ENUM('article', 'faq', 'announcement') NOT NULL,
+    status ENUM('draft', 'published') DEFAULT 'draft',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE patient_settings (
+    patient_id INT PRIMARY KEY,
+    email_notifications BOOLEAN DEFAULT TRUE,
+    sms_notifications BOOLEAN DEFAULT FALSE,
+    theme VARCHAR(20) DEFAULT 'light',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (patient_id) REFERENCES patients(patient_id) ON DELETE CASCADE
+);
+
+CREATE TABLE doctor_schedules (
+    schedule_id INT PRIMARY KEY AUTO_INCREMENT,
+    doctor_id INT,
+    day_of_week ENUM('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'),
+    start_time TIME,
+    end_time TIME,
+    slot_duration INT DEFAULT 30, -- in minutes
+    FOREIGN KEY (doctor_id) REFERENCES doctors(doctor_id)
+);
+
+CREATE TABLE medical.medical_records (
+    record_id INT AUTO_INCREMENT PRIMARY KEY,
+    patient_id INT NOT NULL,
+    doctor_id INT,
+    appointment_id INT,
+    record_type VARCHAR(100),
+    description TEXT,
+    file_path VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (patient_id) REFERENCES patients(patient_id),
+    FOREIGN KEY (doctor_id) REFERENCES doctors(doctor_id),
+    FOREIGN KEY (appointment_id) REFERENCES appointments(appointment_id)
+);
+
+INSERT INTO diseases (disease_name, category, description, symptoms, prevention, cure) 
+VALUES ('Test Disease', 'Test Category', 'Description', 'Symptoms', 'Prevention', 'Cure');
+
+INSERT INTO medical_news (title, content, category, author, published_date, status) 
+VALUES ('Mutations in CPD Gene Identified as Key Cause of Rare Congenital Hearing Loss', 'Scientists have identified mutations in the CPD gene as a key cause of a rare congenital hearing loss, revealing how disruptions in arginine and nitric oxide signaling damage sensory cells in the inner ear. This discovery could lead to targeted therapies for affected children, potentially preventing permanent hearing impairment through early intervention.', 'Genetics/Hearing Disorders', 'ScienceDaily Staff', NOW(), 'published');
+INSERT INTO medical_news (title, content, category, author, published_date, status) 
+VALUES ('Shingles Vaccination Linked to Vascular Benefits', 'Research presented at IDWeek 2025 shows that the shingles vaccine (Shingrix) is associated with reduced risks of vascular events like heart attacks and strokes. The study analyzed data from over 200,000 adults, suggesting the vaccine immune boosting effects may provide broader cardiovascular protection beyond preventing shingles.', 'Infectious Diseases/Preventive Medicine', 'Medscape Medical News Team', NOW(), 'published');
+
+INSERT INTO inventions (invention_name, category, description, benefits, inventor) 
+VALUES ('X-Ray Imaging', 'Medical Imaging', 'A technique using electromagnetic radiation to produce images of bones and internal organs, revealing fractures, tumors, and other abnormalities.', 'Non-invasive visualization of internal structures; critical for diagnosing fractures, infections, and cancers without surgery.', 'Wilhelm Röntgen (1895)');
+INSERT INTO inventions (invention_name, category, description, benefits, inventor) 
+VALUES ('Penicillin', 'Antibiotic', 'The first antibiotic, discovered from Penicillium mold, used to treat bacterial infections by inhibiting bacterial cell wall synthesis.', 'Revolutionized treatment of bacterial infections, saving millions of lives from diseases like pneumonia, syphilis, and sepsis.', 'Alexander Fleming (1928)');
+INSERT INTO inventions (invention_name, category, description, benefits, inventor) 
+VALUES ('Insulin', 'Pharmaceutical', 'A hormone isolated to treat diabetes by regulating blood sugar levels, administered via injections to replace deficient insulin production.', 'Enables management of type 1 and type 2 diabetes, preventing complications like kidney failure, blindness, and amputations.', 'Frederick Banting, Charles Best (1921)');
+
+SELECT a.appointment_id, a.patient_id, p.user_id, u.username 
+FROM appointments a 
+LEFT JOIN patients p ON a.patient_id = p.patient_id 
+LEFT JOIN users u ON p.user_id = u.user_id 
+WHERE p.patient_id IS NULL OR u.user_id IS NULL;
+
+ALTER TABLE appointments MODIFY diagnosis TEXT NOT NULL DEFAULT '';
+ALTER TABLE appointments MODIFY prescription TEXT NOT NULL DEFAULT '';
+ALTER TABLE appointments MODIFY notes TEXT NOT NULL DEFAULT '';
+
+INSERT INTO settings (setting_key, setting_value) VALUES
+    ('contact_email', 'info@caregroup.com'),
+    ('contact_phone', '+91 1800-123-4567');
+
+CREATE TABLE ratings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    patient_id INT,
+    doctor_id INT,
+    rating TINYINT CHECK (rating BETWEEN 1 AND 5),
+    review TEXT,
+    created_at DATETIME,
+    UNIQUE KEY unique_rating (patient_id, doctor_id)
+);
+
+ALTER TABLE appointments 
+ADD COLUMN rating TINYINT(1) NULL DEFAULT NULL,
+ADD COLUMN review TEXT NULL DEFAULT NULL;
+
+ALTER TABLE appointments 
+ADD COLUMN IF NOT EXISTS rating TINYINT(1) NULL DEFAULT NULL,
+ADD COLUMN IF NOT EXISTS review TEXT NULL DEFAULT NULL;
+
+CREATE TABLE IF NOT EXISTS inventions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    invention_name VARCHAR(255) NOT NULL,
+    category VARCHAR(100),
+    description TEXT,
+    benefits TEXT,
+    inventor VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE hospitals (
+    hospital_id INT PRIMARY KEY AUTO_INCREMENT,
+    hospital_name VARCHAR(255) NOT NULL,
+    address TEXT,
+    city_id INT,
+    phone VARCHAR(20),
+    email VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (city_id) REFERENCES cities(city_id)
+);
+
+-- Then add hospital_id to doctors table
+ALTER TABLE doctors ADD COLUMN hospital_id INT;
+ALTER TABLE doctors ADD FOREIGN KEY (hospital_id) REFERENCES hospitals(hospital_id);
+
+SELECT doctor_id, full_name, specialization_id FROM doctors;
+
+SELECT doctor_id, full_name, specialization_id 
+FROM doctors 
+WHERE user_id = (SELECT user_id FROM users WHERE username = 'your_username');
+
+SELECT a.appointment_id, a.patient_id, a.doctor_id, a.rating, a.review, a.status, a.appointment_date, p.full_name as patient_name
+FROM appointments a
+JOIN patients p ON a.patient_id = p.patient_id
+WHERE a.doctor_id = 1 
+AND a.rating IS NOT NULL 
+AND a.rating > 0 
+AND a.status = 'completed';
+
+SELECT COUNT(*) as total_ratings, 
+       AVG(rating) as average_rating,
+       MIN(rating) as min_rating,
+       MAX(rating) as max_rating
+FROM appointments 
+WHERE rating IS NOT NULL 
+AND rating > 0 
+AND status = 'completed';
+
+-- Check column structure
+DESCRIBE appointments;
+
+-- Check if any ratings exist at all
+SELECT COUNT(*) as total_with_ratings 
+FROM appointments 
+WHERE rating IS NOT NULL AND rating > 0;
+
+-- See sample of ratings
+SELECT appointment_id, patient_id, doctor_id, rating, review, status
+FROM appointments 
+WHERE rating IS NOT NULL AND rating > 0
+LIMIT 10;
+
+SELECT d.doctor_id, d.full_name, u.username 
+FROM doctors d 
+JOIN users u ON d.user_id = u.user_id 
+WHERE u.user_id = (SELECT user_id FROM users WHERE username = 'your_login_username');
+
+SELECT doctor_id, full_name FROM doctors;
+
+-- Ensure columns exist
+ALTER TABLE appointments 
+ADD COLUMN IF NOT EXISTS rating TINYINT(1) NULL DEFAULT NULL,
+ADD COLUMN IF NOT EXISTS review TEXT NULL DEFAULT NULL;
+
+-- Optional: Fix old NULL reviews → convert to empty string
+UPDATE appointments 
+SET review = '' 
+WHERE review IS NULL AND rating IS NOT NULL;
+
+SELECT appointment_id, rating, review, status 
+FROM appointments 
+WHERE doctor_id = 6 AND patient_id = 2;
+
+SELECT * FROM appointments WHERE rating IS NOT NULL LIMIT 5;
+
+SELECT 
+    a.appointment_id,
+    a.doctor_id,
+    a.patient_id,
+    a.rating,
+    a.review,
+    a.status,
+    a.appointment_date,
+    p.full_name AS patient_name,
+    d.full_name AS doctor_name
+FROM appointments a
+JOIN patients p ON a.patient_id = p.patient_id
+JOIN doctors d ON a.doctor_id = d.doctor_id
+WHERE a.rating IS NOT NULL
+ORDER BY a.appointment_id DESC
+LIMIT 10;
+
+ALTER TABLE doctors ADD COLUMN total_ratings INT DEFAULT 0;
+
+-- Check a specific doctor's ratings (replace 1 with actual doctor_id)
+SELECT d.doctor_id, d.full_name, d.rating, d.total_ratings,
+       a.appointment_id, a.rating as appointment_rating, a.review
+FROM doctors d
+LEFT JOIN appointments a ON d.doctor_id = a.doctor_id AND a.rating IS NOT NULL
+WHERE d.doctor_id = 1;
+
+-- Check all doctors and their ratings
+SELECT d.doctor_id, d.full_name, d.rating, d.total_ratings,
+       COUNT(a.rating) as total_received_ratings,
+       AVG(a.rating) as calculated_avg_rating
+FROM doctors d
+LEFT JOIN appointments a ON d.doctor_id = a.doctor_id AND a.rating IS NOT NULL
+GROUP BY d.doctor_id, d.full_name, d.rating, d.total_ratings;
+
+-- Find doctors who have appointment ratings but their doctor rating is not updated
+SELECT d.doctor_id, d.full_name, d.rating as doctor_rating,
+       COUNT(a.rating) as appointment_ratings_count,
+       AVG(a.rating) as should_be_rating
+FROM doctors d
+JOIN appointments a ON d.doctor_id = a.doctor_id AND a.rating IS NOT NULL
+GROUP BY d.doctor_id, d.full_name, d.rating
+HAVING d.rating != AVG(a.rating) OR d.rating IS NULL;
+
+-- Update all doctor ratings based on appointments
+UPDATE doctors d
+SET 
+    d.rating = (
+        SELECT COALESCE(AVG(a.rating), 0) 
+        FROM appointments a 
+        WHERE a.doctor_id = d.doctor_id AND a.rating IS NOT NULL
+    ),
+    d.total_ratings = (
+        SELECT COUNT(a.rating) 
+        FROM appointments a 
+        WHERE a.doctor_id = d.doctor_id AND a.rating IS NOT NULL
+    );
+
+    -- Check if appointments are properly rated (replace with actual patient_id)
+SELECT a.appointment_id, a.doctor_id, a.patient_id, a.status, a.rating, a.review,
+       d.full_name as doctor_name, p.full_name as patient_name
+FROM appointments a
+JOIN doctors d ON a.doctor_id = d.doctor_id
+JOIN patients p ON a.patient_id = p.patient_id
+WHERE a.rating IS NOT NULL
+LIMIT 10;
+
+SELECT d.doctor_id, d.full_name, d.rating, d.total_ratings,
+       a.appointment_id, a.rating as appointment_rating, a.review
+FROM doctors d
+LEFT JOIN appointments a ON d.doctor_id = a.doctor_id AND a.rating IS NOT NULL
+WHERE d.doctor_id = 3;
+
+SELECT doctor_id, full_name, specialization_id FROM doctors;
+
+SELECT doctor_id, full_name, specialization_id 
+FROM doctors 
+WHERE user_id = (SELECT user_id FROM users WHERE username = 'your_username');
+
+SELECT a.appointment_id, a.patient_id, a.doctor_id, a.rating, a.review, a.status, a.appointment_date, p.full_name as patient_name
+FROM appointments a
+JOIN patients p ON a.patient_id = p.patient_id
+WHERE a.doctor_id = 1 
+AND a.rating IS NOT NULL 
+AND a.rating > 0 
+AND a.status = 'completed';
+
+SELECT COUNT(*) as total_ratings, 
+       AVG(rating) as average_rating,
+       MIN(rating) as min_rating,
+       MAX(rating) as max_rating
+FROM appointments 
+WHERE rating IS NOT NULL 
+AND rating > 0 
+AND status = 'completed';
+
+-- Check column structure
+DESCRIBE appointments;
+
+-- Check if any ratings exist at all
+SELECT COUNT(*) as total_with_ratings 
+FROM appointments 
+WHERE rating IS NOT NULL AND rating > 0;
+
+-- See sample of ratings
+SELECT appointment_id, patient_id, doctor_id, rating, review, status
+FROM appointments 
+WHERE rating IS NOT NULL AND rating > 0
+LIMIT 10;
+
+SELECT d.doctor_id, d.full_name, u.username 
+FROM doctors d 
+JOIN users u ON d.user_id = u.user_id 
+WHERE u.user_id = (SELECT user_id FROM users WHERE username = 'your_login_username');
+
+SELECT doctor_id, full_name FROM doctors;
+
+SELECT appointment_id, patient_id, doctor_id, appointment_date, status 
+FROM appointments 
+WHERE status = 'completed' 
+AND rating IS NULL 
+LIMIT 5;
+
+-- Find the first completed appointment without rating
+SET @appointment_id = (SELECT appointment_id FROM appointments WHERE status = 'completed' AND rating IS NULL LIMIT 1);
+
+-- Update it with a test rating
+UPDATE appointments 
+SET rating = 5, review = 'Test review for debugging'
+WHERE appointment_id = @appointment_id;
+
+-- Verify the update
+SELECT appointment_id, patient_id, doctor_id, rating, review, status 
+FROM appointments 
+WHERE appointment_id = @appointment_id;
+
+-- Find a doctor and patient to use
+SELECT doctor_id FROM doctors LIMIT 1;
+SELECT patient_id FROM patients LIMIT 1;
+
+-- Then insert a test appointment (replace X with actual doctor_id and Y with actual patient_id)
+INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, symptoms, status, rating, review)
+VALUES (1, 1, CURDATE(), '10:00:00', 'Test symptoms', 'completed', 5, 'Excellent service - test review');
+
+-- Verify
+SELECT * FROM appointments WHERE review LIKE 'Excellent service%';
+
+-- Find the first completed appointment without rating
+SET @appointment_id = (SELECT appointment_id FROM appointments WHERE status = 'completed' AND rating IS NULL LIMIT 1);
+
+-- Update it with a test rating
+UPDATE appointments 
+SET rating = 5, review = 'Test review for debugging'
+WHERE appointment_id = @appointment_id;
+
+-- Verify the update
+SELECT appointment_id, patient_id, doctor_id, rating, review, status 
+FROM appointments 
+WHERE appointment_id = @appointment_id;
+
+-- Find a doctor and patient to use
+SELECT doctor_id FROM doctors LIMIT 1;
+SELECT patient_id FROM patients LIMIT 1;
+
+-- Then insert a test appointment (replace X with actual doctor_id and Y with actual patient_id)
+INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, symptoms, status, rating, review)
+VALUES (1, 1, CURDATE(), '10:00:00', 'Test symptoms', 'completed', 5, 'Excellent service - test review');
+
+-- Verify
+SELECT * FROM appointments WHERE review LIKE 'Excellent service%';
+
+SELECT appointment_id, patient_id, doctor_id, status, rating 
+FROM appointments 
+LIMIT 10;
+
+-- Method 1: Update existing completed appointment
+UPDATE appointments 
+SET rating = 5, review = 'Test review for debugging'
+WHERE status = 'completed' 
+AND rating IS NULL 
+LIMIT 1;
+
+-- Check if it worked
+SELECT appointment_id, patient_id, doctor_id, rating, review 
+FROM appointments 
+WHERE review = 'Test review for debugging';
+
+-- Create doctor_availability table
+CREATE TABLE IF NOT EXISTS doctor_availability (
+    availability_id INT PRIMARY KEY AUTO_INCREMENT,
+    doctor_id INT NOT NULL,
+    availability_type ENUM('daily', 'weekly', 'monthly') NOT NULL,
+    day_of_week INT NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    slot_duration INT DEFAULT 30,
+    max_patients INT DEFAULT 5,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (doctor_id) REFERENCES doctors(doctor_id) ON DELETE CASCADE
+);
+
+-- Create appointments table (if not exists)
+CREATE TABLE IF NOT EXISTS appointments (
+    appointment_id INT PRIMARY KEY AUTO_INCREMENT,
+    patient_id INT NOT NULL,
+    doctor_id INT NOT NULL,
+    availability_id INT,
+    appointment_date DATE NOT NULL,
+    appointment_time TIME NOT NULL,
+    symptoms TEXT,
+    status ENUM('scheduled', 'completed', 'cancelled') DEFAULT 'scheduled',
+    diagnosis TEXT,
+    prescription TEXT,
+    notes TEXT,
+    rating INT,
+    review TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (patient_id) REFERENCES patients(patient_id),
+    FOREIGN KEY (doctor_id) REFERENCES doctors(doctor_id),
+    FOREIGN KEY (availability_id) REFERENCES doctor_availability(availability_id)
+);
+
+CREATE TABLE IF NOT EXISTS patient_vital_signs (
+    vital_id        INT AUTO_INCREMENT PRIMARY KEY,
+    patient_id      INT NOT NULL,
+    doctor_id       INT NOT NULL,
+    recorded_date   DATE NOT NULL,
+    blood_pressure  VARCHAR(20),
+    heart_rate      INT,
+    temperature     DECIMAL(4,2),
+    weight          DECIMAL(5,2),      -- kg
+    height          DECIMAL(5,2),      -- cm
+    oxygen_saturation INT,             -- %
+    notes           TEXT,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_patient (patient_id),
+    INDEX idx_doctor  (doctor_id),
+    FOREIGN KEY (patient_id) REFERENCES patients(patient_id) ON DELETE CASCADE,
+    FOREIGN KEY (doctor_id)  REFERENCES doctors(doctor_id)   ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Create hospitals table if it doesn't exist
+CREATE TABLE IF NOT EXISTS hospitals (
+    hospital_id INT AUTO_INCREMENT PRIMARY KEY,
+    hospital_name VARCHAR(255) NOT NULL,
+    address TEXT,
+    city_id INT,
+    phone VARCHAR(20),
+    email VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (city_id) REFERENCES cities(city_id)
+);
+
+-- Add hospital_id to doctors table if it doesn't exist
+ALTER TABLE doctors 
+ADD COLUMN IF NOT EXISTS hospital_id INT,
+ADD COLUMN IF NOT EXISTS hospital_name VARCHAR(255),
+ADD COLUMN IF NOT EXISTS hospital_address TEXT,
+ADD FOREIGN KEY IF NOT EXISTS (hospital_id) REFERENCES hospitals(hospital_id);
+
+-- Or if you prefer to keep it simple without hospitals table, use this:
+ALTER TABLE doctors 
+ADD COLUMN IF NOT EXISTS hospital_name VARCHAR(255),
+ADD COLUMN IF NOT EXISTS hospital_address TEXT;
+
+-- 3. Add missing columns one by one to avoid syntax issues
+ALTER TABLE doctors ADD COLUMN IF NOT EXISTS experience INT DEFAULT 0;
+ALTER TABLE doctors ADD COLUMN IF NOT EXISTS qualification VARCHAR(255);
+ALTER TABLE doctors ADD COLUMN IF NOT EXISTS consultation_fee DECIMAL(10,2) DEFAULT 500.00;
+ALTER TABLE doctors ADD COLUMN IF NOT EXISTS rating DECIMAL(3,2) DEFAULT 0.00;
+ALTER TABLE doctors ADD COLUMN IF NOT EXISTS profile_picture VARCHAR(500);
+ALTER TABLE doctors ADD COLUMN IF NOT EXISTS hospital_name VARCHAR(255);
+ALTER TABLE doctors ADD COLUMN IF NOT EXISTS hospital_address TEXT;
+ALTER TABLE doctors ADD COLUMN IF NOT EXISTS status ENUM('active', 'inactive') DEFAULT 'active';
+
+-- If the above fails, try creating a new column and copying data
+ALTER TABLE doctors ADD COLUMN doctor_name VARCHAR(255);
+UPDATE doctors SET doctor_name = name;
+ALTER TABLE doctors DROP COLUMN name;
+ALTER TABLE doctors MODIFY COLUMN doctor_name VARCHAR(255) NOT NULL;
+
+-- Add image_url column to medical_news table
+ALTER TABLE medical_news ADD COLUMN image_url VARCHAR(500) AFTER content;
+
+ALTER TABLE inventions 
+ADD COLUMN image_url VARCHAR(255) NULL AFTER inventor;
+
+UPDATE medical_news
+SET image_url = REPLACE(image_url, 'C:/Users/13-05-2024/Downloads/D/htdocs/careGroup/', '');
+
+SET image = REPLACE(image, 'C:/Users/13-05-2024/Downloads/D/htdocs/careGroup/', '');
+
+UPDATE medical_news 
+SET image_url = REPLACE(image_url, 'admin/uploads/news/', 'uploads/news/') 
+WHERE image_url LIKE '%admin/uploads/news/%';
+
+ALTER TABLE doctors 
+ADD COLUMN working_days VARCHAR(100),
+ADD COLUMN start_time TIME,
+ADD COLUMN end_time TIME,
+ADD COLUMN slot_duration INT DEFAULT 30,
+ADD COLUMN max_patients_per_day INT DEFAULT 20;
+
+-- Check if columns exist before adding them
+ALTER TABLE doctor_availability 
+ADD COLUMN IF NOT EXISTS working_days VARCHAR(100),
+ADD COLUMN IF NOT EXISTS start_time TIME,
+ADD COLUMN IF NOT EXISTS end_time TIME,
+ADD COLUMN IF NOT EXISTS slot_duration INT DEFAULT 30,
+ADD COLUMN IF NOT EXISTS max_patients_per_day INT DEFAULT 20;
+
+CREATE TABLE IF NOT EXISTS notifications (
+    notification_id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    user_type ENUM('doctor', 'patient', 'admin') NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    type ENUM('appointment', 'reminder', 'system', 'alert') DEFAULT 'appointment',
+    is_read BOOLEAN DEFAULT FALSE,
+    related_id INT, -- appointment_id ya doctor_id etc.
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+UPDATE appointments 
+SET status = 'missed' 
+WHERE appointment_date < CURDATE() 
+AND status = 'scheduled';
+
+UPDATE appointments 
+SET status = 'missed' 
+WHERE appointment_date < CURDATE() 
+AND status = 'scheduled';
+
+ALTER TABLE notifications ADD COLUMN reference_id INT NULL AFTER type;
+
+-- Add status column if it doesn't exist
+ALTER TABLE notifications ADD COLUMN status ENUM('unread', 'read') DEFAULT 'unread' AFTER reference_id;
+
+-- Remove is_read column if it exists (we'll use status instead)
+ALTER TABLE notifications DROP COLUMN IF EXISTS is_read;
+
+-- Update doctors table to add review count columns if they don't exist
+ALTER TABLE doctors 
+ADD COLUMN IF NOT EXISTS total_reviews INT DEFAULT 0,
+ADD COLUMN IF NOT EXISTS total_ratings DECIMAL(10,2) DEFAULT 0,
+ADD COLUMN IF NOT EXISTS rating DECIMAL(3,2) DEFAULT 0;
+
+UPDATE doctors d
+SET total_reviews = (SELECT COUNT(*) FROM reviews WHERE doctor_id = d.doctor_id AND status = 'approved'),
+    total_ratings = (SELECT SUM(rating) FROM reviews WHERE doctor_id = d.doctor_id AND status = 'approved'),
+    rating = (SELECT AVG(rating) FROM reviews WHERE doctor_id = d.doctor_id AND status = 'approved');
+    
+ALTER TABLE appointments 
+MODIFY COLUMN status ENUM('scheduled', 'completed', 'cancelled', 'missed') 
+DEFAULT 'scheduled';
+
+UPDATE appointments a
+JOIN doctors d ON a.doctor_id = d.doctor_id
+SET a.status = 'missed'
+WHERE a.appointment_date < CURDATE()
+  AND a.status = 'scheduled';
+
+UPDATE appointments a
+JOIN doctors d ON a.doctor_id = d.doctor_id
+SET a.status = 'missed'
+WHERE a.appointment_date = CURDATE()
+  AND a.appointment_time < CURTIME()
+  AND a.status = 'scheduled';
+
+UPDATE appointments 
+SET status = 'missed' 
+WHERE appointment_date < '2025-11-16' 
+  AND status = 'scheduled';
+
+DESCRIBE doctor_availability;
+
+ALTER TABLE doctor_availability 
+ADD COLUMN IF NOT EXISTS max_patients_per_slot INT DEFAULT 1;
+
+ALTER TABLE doctor_availability 
+ADD COLUMN IF NOT EXISTS is_available TINYINT(1) DEFAULT 1;
+
+ALTER TABLE doctor_availability 
+ADD COLUMN IF NOT EXISTS doctor_id INT NOT NULL,
+ADD COLUMN IF NOT EXISTS day_of_week VARCHAR(10) NOT NULL,
+ADD COLUMN IF NOT EXISTS time_slot TIME NOT NULL;
+
+ALTER TABLE appointments ADD COLUMN appointment_type VARCHAR(50) DEFAULT 'consultation' AFTER notes;
+
+
+
+
+
+
+
+admin = password
+Doctor added successfully! Username: anusha844 | Password: iyhL3XEc (Please save these credentials)
+Doctor added successfully! Username: zara819 | Password: 43NWJCyp (Please save these credentials)
+Doctor added successfully! Username: sara983 | Password: 4EYmfPFa (Please save these credent
+Doctor added successfully! Username: filza_hashmi319 | Password: DdX2M0UE (Please save these credentials)
+Username: wahaj | Password: wahaj123 
+Username: filza | Password: filza1234 
+naveed = default123
+sana = default123
+rimsha = default123
+
+
